@@ -1,5 +1,6 @@
 import uuid
 
+from sqlalchemy import JSON
 from sqlmodel import Field, SQLModel
 
 

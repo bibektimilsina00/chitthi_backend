@@ -1,10 +1,93 @@
-from .auth import NewPassword, Token, TokenPayload
-from .common import Message
-from .item import ItemBase, ItemCreate, ItemPublic, ItemsPublic, ItemUpdate
-from .user import (
+# Schema imports for API validation
+from app.schemas.auth import (
+    NewPassword,
+    OAuthProviderBase,
+    OAuthProviderCreate,
+    RefreshTokenBase,
+    RefreshTokenCreate,
+    Token,
+    TokenPayload,
+    UserSessionBase,
+    UserSessionCreate,
+    UserSessionUpdate,
+)
+from app.schemas.common import Message
+from app.schemas.contact import (
+    BlockBase,
+    BlockCreate,
+    ContactBase,
+    ContactCreate,
+    ContactUpdate,
+)
+from app.schemas.conversation import (
+    ConversationBase,
+    ConversationCreate,
+    ConversationMemberBase,
+    ConversationMemberCreate,
+    ConversationMemberUpdate,
+    ConversationUpdate,
+)
+from app.schemas.crypto import (
+    DeviceKeyBase,
+    DeviceKeyCreate,
+    IdentityKeyBase,
+    IdentityKeyCreate,
+    IdentityKeyUpdate,
+    KeyBackupBase,
+    KeyBackupCreate,
+    OneTimePrekeyBase,
+    OneTimePrekeyCreate,
+)
+from app.schemas.device import (
+    DeviceBase,
+    DeviceCreate,
+    DevicePublic,
+    DevicesPublic,
+    DeviceUpdate,
+)
+from app.schemas.item import ItemBase, ItemCreate, ItemPublic, ItemsPublic, ItemUpdate
+from app.schemas.media import (
+    MediaStoreBase,
+    MediaStoreCreate,
+    MediaStoreUpdate,
+    PushNotificationBase,
+)
+from app.schemas.message import (
+    MessageAttachmentBase,
+    MessageAttachmentCreate,
+    MessageBase,
+    MessageCreate,
+    MessageReactionBase,
+    MessageReactionCreate,
+    MessageStatusBase,
+    MessageStatusCreate,
+    MessageUpdate,
+)
+from app.schemas.moderation import (
+    CallLogBase,
+    CallLogCreate,
+    CallLogUpdate,
+    ModerationLogBase,
+    ModerationLogCreate,
+    ModerationLogUpdate,
+    ReportBase,
+    ReportCreate,
+    ReportUpdate,
+    ScheduledMessageBase,
+    ScheduledMessageCreate,
+    ScheduledMessageUpdate,
+    UserBanBase,
+    UserBanCreate,
+    UserBanUpdate,
+)
+from app.schemas.user import (
     UpdatePassword,
     UserBase,
     UserCreate,
+    UserProfileBase,
+    UserProfileCreate,
+    UserProfilePublic,
+    UserProfileUpdate,
     UserPublic,
     UserRegister,
     UsersPublic,
@@ -13,25 +96,96 @@ from .user import (
 )
 
 __all__ = [
-    # User schemas
-    "UserBase",
-    "UserCreate",
-    "UserRegister",
-    "UserUpdate",
-    "UserUpdateMe",
-    "UpdatePassword",
-    "UserPublic",
-    "UsersPublic",
-    # Item schemas
-    "ItemBase",
-    "ItemCreate",
-    "ItemUpdate",
-    "ItemPublic",
-    "ItemsPublic",
     # Common schemas
     "Message",
-    # Auth schemas
     "Token",
     "TokenPayload",
     "NewPassword",
+    # User schemas
+    "UpdatePassword",
+    "UserBase",
+    "UserCreate",
+    "UserPublic",
+    "UserRegister",
+    "UsersPublic",
+    "UserUpdate",
+    "UserUpdateMe",
+    "UserProfileBase",
+    "UserProfileCreate",
+    "UserProfilePublic",
+    "UserProfileUpdate",
+    # Item schemas
+    "ItemBase",
+    "ItemCreate",
+    "ItemPublic",
+    "ItemsPublic",
+    "ItemUpdate",
+    # Device schemas
+    "DeviceBase",
+    "DeviceCreate",
+    "DevicePublic",
+    "DevicesPublic",
+    "DeviceUpdate",
+    # Conversation schemas
+    "ConversationBase",
+    "ConversationCreate",
+    "ConversationUpdate",
+    "ConversationMemberBase",
+    "ConversationMemberCreate",
+    "ConversationMemberUpdate",
+    # Message schemas
+    "MessageBase",
+    "MessageCreate",
+    "MessageUpdate",
+    "MessageAttachmentBase",
+    "MessageAttachmentCreate",
+    "MessageStatusBase",
+    "MessageStatusCreate",
+    "MessageReactionBase",
+    "MessageReactionCreate",
+    # Auth schemas
+    "UserSessionBase",
+    "UserSessionCreate",
+    "UserSessionUpdate",
+    "RefreshTokenBase",
+    "RefreshTokenCreate",
+    "OAuthProviderBase",
+    "OAuthProviderCreate",
+    # Crypto schemas
+    "IdentityKeyBase",
+    "IdentityKeyCreate",
+    "IdentityKeyUpdate",
+    "OneTimePrekeyBase",
+    "OneTimePrekeyCreate",
+    "DeviceKeyBase",
+    "DeviceKeyCreate",
+    "KeyBackupBase",
+    "KeyBackupCreate",
+    # Contact schemas
+    "ContactBase",
+    "ContactCreate",
+    "ContactUpdate",
+    "BlockBase",
+    "BlockCreate",
+    # Media schemas
+    "MediaStoreBase",
+    "MediaStoreCreate",
+    "MediaStoreUpdate",
+    "PushNotificationBase",
+    # Moderation schemas
+    "ReportBase",
+    "ReportCreate",
+    "ReportUpdate",
+    "ModerationLogBase",
+    "ModerationLogCreate",
+    "ModerationLogUpdate",
+    "UserBanBase",
+    "UserBanCreate",
+    "UserBanUpdate",
+    "ScheduledMessageBase",
+    "ScheduledMessageCreate",
+    "ScheduledMessageUpdate",
+    "CallLogBase",
+    "CallLogCreate",
+    "CallLogUpdate",
 ]

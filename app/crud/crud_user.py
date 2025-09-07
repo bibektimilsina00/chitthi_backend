@@ -14,6 +14,10 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         statement = select(User).where(User.email == email)
         return session.exec(statement).first()
 
+    def get_by_username(self, session: Session, *, username: str) -> User | None:
+        statement = select(User).where(User.username == username)
+        return session.exec(statement).first()
+
     def create(self, session: Session, *, obj_in: UserCreate) -> User:
         create_data = obj_in.model_dump()
         create_data.pop("password")
@@ -49,7 +53,7 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         user = self.get_by_email(session=session, email=email)
         if not user:
             return None
-        if not verify_password(password, user.hashed_password):
+        if not verify_password(password, user.password_hash):
             return None
         return user
 
