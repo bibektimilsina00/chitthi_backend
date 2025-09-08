@@ -28,7 +28,9 @@ class Conversation(ConversationBase, table=True):
         back_populates="conversation", cascade_delete=True
     )
     messages: list["Message"] = Relationship(
-        back_populates="conversation", cascade_delete=True
+        back_populates="conversation",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "[Message.conversation_id]"},
     )
     last_message: Optional["Message"] = Relationship(
         sa_relationship_kwargs={

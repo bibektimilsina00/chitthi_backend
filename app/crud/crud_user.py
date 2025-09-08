@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, func, or_, select
 
 from app.core.security import get_password_hash, verify_password
 from app.crud.base import CRUDBase
@@ -62,6 +62,54 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
 
     def is_superuser(self, user: User) -> bool:
         return user.is_superuser
+
+    def search_users(
+        self,
+        session: Session,
+        *,
+        search_term: str,
+        skip: int = 0,
+        limit: int = 20,
+        exclude_user_id: uuid.UUID | None = None,
+    ) -> list[User]:
+        """
+        Search users by username, display_name, or email.
+        Excludes the current user by default.
+        """
+        # Create search pattern for ILIKE (case-insensitive)
+        search_pattern = f"%{search_term.lower()}%"
+
+        # Build base query with search conditions
+        statement = select(User).where(
+            or_(
+                func.lower(User.username).contains(search_pattern),
+                func.lower(User.display_name).contains(search_pattern),
+                func.lower(User.email).contains(search_pattern),
+            )
+        )
+
+        # Exclude current user if specified
+        if exclude_user_id:
+            statement = statement.where(User.id != exclude_user_id)
+
+        # Only include active users
+        statement = statement.where(User.is_active == True)
+
+        # Add ordering by relevance (exact match first, then partial matches)
+        statement = (
+            statement.order_by(
+                # Exact username matches first
+                func.lower(User.username) == search_term.lower(),
+                # Then exact display name matches
+                func.lower(User.display_name) == search_term.lower(),
+                # Then by username alphabetically
+                User.username,
+            )
+            .offset(skip)
+            .limit(limit)
+        )
+
+        return list(session.exec(statement).all())
 
 
 user = CRUDUser(User)

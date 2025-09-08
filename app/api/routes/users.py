@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import col, delete
 
 from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
@@ -149,6 +149,39 @@ def register_user(session: SessionDep, user_in: UserRegister) -> Any:
     user_create = UserCreate.model_validate(user_in)
     user = user_service.create_user(session=session, user_create=user_create)
     return user
+
+
+@router.get("/search", response_model=UsersPublic)
+def search_users(
+    session: SessionDep,
+    current_user: CurrentUser,
+    search: str = Query(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Search term for username, display name, or email",
+    ),
+    skip: int = Query(default=0, ge=0, description="Number of users to skip"),
+    limit: int = Query(
+        default=20, ge=1, le=50, description="Maximum number of users to return"
+    ),
+) -> Any:
+    """
+    Search users for creating conversations.
+
+    Search by username, display name, or email address.
+    Returns active users only, excluding the current user.
+    """
+    users = user_service.search_users(
+        session=session,
+        search_term=search,
+        skip=skip,
+        limit=limit,
+        exclude_user_id=current_user.id,
+    )
+
+    users_public = [UserPublic.model_validate(user) for user in users]
+    return UsersPublic(data=users_public, count=len(users_public))
 
 
 @router.get("/{user_id}", response_model=UserPublic)

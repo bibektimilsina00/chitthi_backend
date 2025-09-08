@@ -30,7 +30,10 @@ class Message(MessageBase, table=True):
     deleted_at: Optional[datetime] = Field(default=None)
 
     # Relationships
-    conversation: "Conversation" = Relationship(back_populates="messages")
+    conversation: "Conversation" = Relationship(
+        back_populates="messages",
+        sa_relationship_kwargs={"foreign_keys": "[Message.conversation_id]"},
+    )
     sender: "User" = Relationship(back_populates="sent_messages")
     participants_cache: Optional["MessageParticipantsCache"] = Relationship(
         back_populates="message", cascade_delete=True
@@ -77,7 +80,7 @@ class MessageEncryptedKeys(SQLModel, table=True):
     # Relationships
     message: "Message" = Relationship(back_populates="encrypted_keys")
     recipient_user: "User" = Relationship()
-    recipient_device: "Device" = Relationship()
+    recipient_device: "Device" = Relationship(back_populates="message_encrypted_keys")
 
 
 class MessageAttachment(MessageAttachmentBase, table=True):
@@ -106,7 +109,7 @@ class MessageStatus(MessageStatusBase, table=True):
     # Relationships
     message: "Message" = Relationship(back_populates="statuses")
     user: "User" = Relationship()
-    device: Optional["Device"] = Relationship()
+    device: Optional["Device"] = Relationship(back_populates="message_statuses")
 
 
 class MessageReaction(MessageReactionBase, table=True):

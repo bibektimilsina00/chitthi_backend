@@ -8,6 +8,11 @@ from app.schemas.user import UserCreate
 engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
 
 
+def get_db():
+    with Session(engine) as session:
+        yield session
+
+
 # make sure all SQLModel models are imported (app.models) before initializing DB
 # otherwise, SQLModel might fail to initialize relationships properly
 # for more details: https://github.com/fastapi/full-stack-fastapi-template/issues/28
@@ -31,5 +36,6 @@ def init_db(session: Session) -> None:
             email=settings.FIRST_SUPERUSER,
             password=settings.FIRST_SUPERUSER_PASSWORD,
             is_superuser=True,
+            username="Admin User",
         )
         user = user_crud.create(session=session, obj_in=user_in)

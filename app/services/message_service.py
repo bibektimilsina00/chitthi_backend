@@ -32,14 +32,20 @@ class MessageService:
             recipient_encrypted_keys: List of encrypted keys for each recipient device
                 Format: [{"user_id": "...", "device_id": "...", "encrypted_key": "...", "nonce": "..."}]
         """
-        # Create the message
-        message_in = MessageCreate(**message_create.model_dump())
-        message_data = message_in.model_dump()
-        message_data["sender_id"] = sender_id
+        from datetime import datetime
 
-        message = crud.message.create(
-            session=session, obj_in=MessageCreate(**message_data)
-        )
+        from app.models.message import Message
+
+        # Create the message directly with the Message model to include sender_id
+        message_data = message_create.model_dump()
+        message_data["sender_id"] = sender_id
+        message_data["id"] = uuid.uuid4()
+        message_data["created_at"] = datetime.utcnow()
+
+        message = Message(**message_data)
+        session.add(message)
+        session.flush()  # Flush to get the ID without committing
+        session.refresh(message)
 
         # Create encrypted keys for each recipient device
         for key_data in recipient_encrypted_keys:
@@ -53,8 +59,8 @@ class MessageService:
             )
             session.add(encrypted_key)
 
-        session.commit()
-        session.refresh(message)
+        # Let the route handler manage the commit
+        session.flush()  # Ensure all objects are persisted and have IDs
         return message
 
     def get_conversation_messages(

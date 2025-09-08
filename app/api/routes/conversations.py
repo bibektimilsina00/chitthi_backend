@@ -53,6 +53,7 @@ def create_conversation(
     conversation = conversation_service.create_conversation(
         session=session, conversation_create=conversation_in, creator_id=current_user.id
     )
+
     return ConversationPublic.model_validate(conversation)
 
 

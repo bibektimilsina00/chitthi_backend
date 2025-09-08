@@ -33,6 +33,8 @@ class Device(DeviceBase, table=True):
         back_populates="device", cascade_delete=True
     )
     message_encrypted_keys: list["MessageEncryptedKeys"] = Relationship(
-        cascade_delete=True
+        back_populates="recipient_device", cascade_delete=True
     )
-    message_statuses: list["MessageStatus"] = Relationship(cascade_delete=True)
+    message_statuses: list["MessageStatus"] = Relationship(
+        back_populates="device", cascade_delete=True
+    )

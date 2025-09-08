@@ -19,7 +19,7 @@ class ConversationBase(SQLModel):
 
 # Properties to receive via API on creation
 class ConversationCreate(ConversationBase):
-    pass
+    creator_id: Optional[uuid.UUID] = Field(default=None)
 
 
 # Properties to receive via API on update

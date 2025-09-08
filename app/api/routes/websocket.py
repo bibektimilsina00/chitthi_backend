@@ -4,11 +4,17 @@ import json
 import uuid
 from typing import Any, Dict, List
 
+import jwt
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from jwt.exceptions import InvalidTokenError
+from pydantic import ValidationError
 from sqlmodel import Session
 
+from app.core import security
+from app.core.config import settings
 from app.core.db import engine
 from app.models.user import User
+from app.schemas import TokenPayload
 from app.services import conversation_service, message_service
 
 router = APIRouter()
@@ -132,22 +138,38 @@ async def websocket_endpoint(
     user_id = None
 
     try:
-        # Authenticate user from WebSocket headers/query params
-        # For now, we'll extract from query params - in production use JWT from headers
+        # Authenticate user from WebSocket query params
         token = websocket.query_params.get("token")
         if not token:
             await websocket.close(code=4001, reason="Authentication required")
             return
 
-        # Get user from token (simplified - use your auth logic)
+        # Validate JWT token and get user
         with Session(engine) as session:
-            # For now, just get the first user - in production implement proper auth
-            from sqlmodel import select
+            try:
+                # Decode and verify the JWT token
+                payload = jwt.decode(
+                    token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
+                )
+                token_data = TokenPayload(**payload)
 
-            stmt = select(User).limit(1)
-            user = session.exec(stmt).first()
-            if not user:
-                await websocket.close(code=4001, reason="No users found")
+                # Get user from database
+                user = session.get(User, token_data.sub)
+                if not user:
+                    await websocket.close(code=4001, reason="User not found")
+                    return
+
+                if not user.is_active:
+                    await websocket.close(code=4001, reason="User inactive")
+                    return
+
+            except (InvalidTokenError, ValidationError) as e:
+                await websocket.close(code=4001, reason="Invalid token")
+                return
+            except Exception as e:
+                await websocket.close(
+                    code=4001, reason=f"Authentication failed: {str(e)}"
+                )
                 return
 
         user_id = str(user.id)

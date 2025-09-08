@@ -1,0 +1,1185 @@
+# Chat & Video Call API - OpenAPI Specification
+
+## API Endpoints
+
+### Message Management
+
+```yaml
+/messages/:
+  get:
+    summary: Get conversation messages
+    description: Retrieve encrypted messages from a specific conversation with pagination
+    tags:
+      - Messages
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: conversation_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: UUID of the conversation to retrieve messages from
+        example: "456e7890-e89b-12d3-a456-426614174001"
+      - name: skip
+        in: query
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+        description: Number of messages to skip for pagination
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 100
+          minimum: 1
+          maximum: 100
+        description: Maximum number of messages to return
+    responses:
+      '200':
+        description: Messages retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessagesResponse'
+            example:
+              data:
+                - id: "123e4567-e89b-12d3-a456-426614174000"
+                  conversation_id: "456e7890-e89b-12d3-a456-426614174001"
+                  sender_id: "789e0123-e89b-12d3-a456-426614174002"
+                  ciphertext: "encrypted_message_content"
+                  message_type: "text"
+                  created_at: "2025-09-08T10:30:00Z"
+              count: 25
+      '400':
+        description: Invalid conversation ID or user not authorized
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+      '401':
+        description: Not authenticated
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+
+  post:
+    summary: Send encrypted message
+    description: Send a new encrypted message to a conversation
+    tags:
+      - Messages
+    security:
+      - HTTPBearer: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageCreate'
+          example:
+            conversation_id: "456e7890-e89b-12d3-a456-426614174001"
+            ciphertext: "encrypted_message_content"
+            message_type: "text"
+            recipient_keys:
+              - recipient_user_id: "user_uuid"
+                recipient_device_id: "device_uuid"
+                encrypted_key: "encrypted_content_key"
+                key_algo: "x25519-aead"
+                nonce: "key_nonce"
+    responses:
+      '200':
+        description: Message sent successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessagePublic'
+      '400':
+        description: Invalid message data or conversation access denied
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+```
+
+### Conversation Management
+
+```yaml
+/conversations/:
+  get:
+    summary: Get user conversations
+    description: Retrieve all conversations for the authenticated user
+    tags:
+      - Conversations
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: skip
+        in: query
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+        description: Number of conversations to skip
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 100
+          minimum: 1
+          maximum: 100
+        description: Maximum conversations to return
+    responses:
+      '200':
+        description: Conversations retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationsPublic'
+
+  post:
+    summary: Create new conversation
+    description: Create a new group conversation or direct message
+    tags:
+      - Conversations
+    security:
+      - HTTPBearer: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConversationCreate'
+          example:
+            title: "Project Team Chat"
+            type: "group"
+            visibility: "private"
+            participants:
+              - "user_uuid_1"
+              - "user_uuid_2"
+    responses:
+      '200':
+        description: Conversation created successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPublic'
+
+/conversations/{conversation_id}:
+  get:
+    summary: Get conversation details
+    description: Get detailed information about a specific conversation
+    tags:
+      - Conversations
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Conversation ID
+    responses:
+      '200':
+        description: Conversation details retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPublic'
+      '404':
+        description: Conversation not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+
+  patch:
+    summary: Update conversation
+    description: Update conversation settings (title, description, etc.)
+    tags:
+      - Conversations
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Conversation ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConversationUpdate'
+    responses:
+      '200':
+        description: Conversation updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationPublic'
+
+/conversations/{conversation_id}/members:
+  post:
+    summary: Add conversation members
+    description: Add new members to a group conversation
+    tags:
+      - Conversations
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Conversation ID
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConversationMemberCreate'
+    responses:
+      '200':
+        description: Member added successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationMemberPublic'
+
+/conversations/{conversation_id}/members/{user_id}:
+  delete:
+    summary: Remove conversation member
+    description: Remove a member from a conversation
+    tags:
+      - Conversations
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Conversation ID
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: User ID to remove
+    responses:
+      '200':
+        description: Member removed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
+```
+
+### Call Management
+
+```yaml
+/calls/initiate:
+  post:
+    summary: Initiate audio or video call
+    description: Start a new call with specified participants
+    tags:
+      - Calls
+    security:
+      - HTTPBearer: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CallInitiate'
+          example:
+            participants:
+              - "user_uuid_1"
+              - "user_uuid_2"
+            call_type: "video"
+    responses:
+      '200':
+        description: Call initiated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallInitiateResponse'
+            example:
+              call_id: "call_uuid"
+              status: "initiated"
+              participants: ["caller_uuid", "user_uuid_1", "user_uuid_2"]
+              type: "video"
+              signaling_url: "/api/v1/calls/call_uuid/signaling"
+      '400':
+        description: User already in call or invalid participants
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+
+/calls/{call_id}/join:
+  post:
+    summary: Join existing call
+    description: Join a call that was initiated by another user
+    tags:
+      - Calls
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: call_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Call ID to join
+    responses:
+      '200':
+        description: Successfully joined call
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallJoinResponse'
+      '403':
+        description: Not invited to this call
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+      '404':
+        description: Call not found
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HTTPValidationError'
+
+/calls/{call_id}/end:
+  post:
+    summary: End call
+    description: End an active call
+    tags:
+      - Calls
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: call_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Call ID to end
+    responses:
+      '200':
+        description: Call ended successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
+            example:
+              message: "Call ended"
+
+/calls/{call_id}:
+  get:
+    summary: Get call information
+    description: Get current status and details of a call
+    tags:
+      - Calls
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: call_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Call ID
+    responses:
+      '200':
+        description: Call information retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallInfo'
+
+/calls/:
+  get:
+    summary: Get active calls
+    description: Get list of active calls for current user
+    tags:
+      - Calls
+    security:
+      - HTTPBearer: []
+    responses:
+      '200':
+        description: Active calls retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActiveCallsResponse'
+
+/calls/history:
+  get:
+    summary: Get call history
+    description: Get call logs and history for current user
+    tags:
+      - Calls
+    security:
+      - HTTPBearer: []
+    parameters:
+      - name: skip
+        in: query
+        schema:
+          type: integer
+          default: 0
+        description: Number of logs to skip
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 50
+          maximum: 100
+        description: Maximum logs to return
+      - name: conversation_id
+        in: query
+        schema:
+          type: string
+          format: uuid
+        description: Filter by conversation ID
+    responses:
+      '200':
+        description: Call history retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallHistoryResponse'
+```
+
+### WebSocket Endpoints
+
+```yaml
+/chat/ws/{device_id}:
+  get:
+    summary: WebSocket connection for real-time messaging
+    description: Establish WebSocket connection for real-time message events
+    tags:
+      - WebSocket
+    parameters:
+      - name: device_id
+        in: path
+        required: true
+        schema:
+          type: string
+          default: default
+        description: Device identifier
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+        description: JWT authentication token
+      - name: Connection
+        in: header
+        required: true
+        schema:
+          type: string
+          enum: ["Upgrade"]
+      - name: Upgrade
+        in: header
+        required: true
+        schema:
+          type: string
+          enum: ["websocket"]
+    responses:
+      '101':
+        description: WebSocket connection established
+      '401':
+        description: Authentication required
+      '403':
+        description: Connection forbidden
+
+/calls/{call_id}/signaling:
+  get:
+    summary: WebSocket connection for WebRTC signaling
+    description: WebSocket endpoint for peer-to-peer call signaling
+    tags:
+      - WebSocket
+    parameters:
+      - name: call_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: Call ID for signaling
+      - name: Connection
+        in: header
+        required: true
+        schema:
+          type: string
+          enum: ["Upgrade"]
+      - name: Upgrade
+        in: header
+        required: true
+        schema:
+          type: string
+          enum: ["websocket"]
+    responses:
+      '101':
+        description: WebSocket connection established for signaling
+      '404':
+        description: Call not found
+```
+
+---
+
+## Schema Definitions
+
+```yaml
+components:
+  schemas:
+    MessageCreate:
+      type: object
+      required:
+        - conversation_id
+        - ciphertext
+        - message_type
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+          description: Target conversation ID
+        ciphertext:
+          type: string
+          description: Encrypted message content
+        message_type:
+          type: string
+          enum: ["text", "image", "audio", "video", "document", "location", "contact", "system"]
+          description: Type of message
+        recipient_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageEncryptedKey'
+          description: Encrypted keys for each recipient
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageAttachmentCreate'
+          description: File attachments
+
+    MessageEncryptedKey:
+      type: object
+      required:
+        - recipient_user_id
+        - recipient_device_id
+        - encrypted_key
+        - key_algo
+        - nonce
+      properties:
+        recipient_user_id:
+          type: string
+          format: uuid
+          description: Recipient user ID
+        recipient_device_id:
+          type: string
+          format: uuid
+          description: Recipient device ID
+        encrypted_key:
+          type: string
+          description: Encrypted content encryption key
+        key_algo:
+          type: string
+          default: "x25519-aead"
+          description: Key encryption algorithm
+        nonce:
+          type: string
+          description: Cryptographic nonce
+
+    MessageAttachmentCreate:
+      type: object
+      required:
+        - file_name
+        - file_size
+        - content_type
+        - storage_id
+      properties:
+        file_name:
+          type: string
+          maxLength: 255
+          description: Original file name
+        file_size:
+          type: integer
+          minimum: 0
+          description: File size in bytes
+        content_type:
+          type: string
+          description: MIME type of the file
+        storage_id:
+          type: string
+          format: uuid
+          description: Reference to stored file
+
+    MessagePublic:
+      type: object
+      required:
+        - id
+        - conversation_id
+        - sender_id
+        - ciphertext
+        - message_type
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Message ID
+        conversation_id:
+          type: string
+          format: uuid
+          description: Conversation ID
+        sender_id:
+          type: string
+          format: uuid
+          description: Sender user ID
+        ciphertext:
+          type: string
+          description: Encrypted message content
+        ciphertext_nonce:
+          type: string
+          description: Encryption nonce
+        encryption_algo:
+          type: string
+          description: Encryption algorithm used
+        message_type:
+          type: string
+          enum: ["text", "image", "audio", "video", "document", "location", "contact", "system"]
+        preview_text_hash:
+          type: string
+          nullable: true
+          description: Hash for notification preview
+        is_edited:
+          type: boolean
+          description: Whether message was edited
+        is_deleted:
+          type: boolean
+          description: Whether message was deleted
+        created_at:
+          type: string
+          format: date-time
+          description: Message creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        encrypted_keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageEncryptedKey'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageAttachment'
+        statuses:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageStatus'
+
+    MessageAttachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        file_name:
+          type: string
+        file_size:
+          type: integer
+        content_type:
+          type: string
+        storage_id:
+          type: string
+          format: uuid
+
+    MessageStatus:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: ["sent", "delivered", "read", "failed"]
+        status_at:
+          type: string
+          format: date-time
+
+    MessagesResponse:
+      type: object
+      required:
+        - data
+        - count
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessagePublic'
+        count:
+          type: integer
+          description: Total number of messages
+
+    ConversationCreate:
+      type: object
+      required:
+        - type
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: Conversation title (for groups)
+        type:
+          type: string
+          enum: ["direct", "group", "channel", "support"]
+          description: Type of conversation
+        visibility:
+          type: string
+          enum: ["private", "public", "invite_only"]
+          default: "private"
+          description: Conversation visibility
+        description:
+          type: string
+          nullable: true
+          description: Conversation description
+        participants:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Initial participant user IDs
+
+    ConversationPublic:
+      type: object
+      required:
+        - id
+        - type
+        - visibility
+        - creator_id
+        - member_count
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          nullable: true
+        type:
+          type: string
+          enum: ["direct", "group", "channel", "support"]
+        visibility:
+          type: string
+          enum: ["private", "public", "invite_only"]
+        creator_id:
+          type: string
+          format: uuid
+        member_count:
+          type: integer
+        last_message_id:
+          type: string
+          format: uuid
+          nullable: true
+        last_activity:
+          type: string
+          format: date-time
+          nullable: true
+        archived:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ConversationUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        archived:
+          type: boolean
+
+    ConversationsPublic:
+      type: object
+      required:
+        - data
+        - count
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationPublic'
+        count:
+          type: integer
+
+    ConversationMemberCreate:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: ["admin", "moderator", "member"]
+          default: "member"
+
+    ConversationMemberPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: ["admin", "moderator", "member"]
+        joined_at:
+          type: string
+          format: date-time
+        last_read_message_id:
+          type: string
+          format: uuid
+          nullable: true
+        unread_count:
+          type: integer
+        is_muted:
+          type: boolean
+
+    CallInitiate:
+      type: object
+      required:
+        - participants
+      properties:
+        participants:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: User IDs to invite to call
+        call_type:
+          type: string
+          enum: ["audio", "video"]
+          default: "audio"
+          description: Type of call
+
+    CallInitiateResponse:
+      type: object
+      required:
+        - call_id
+        - status
+        - participants
+        - type
+        - signaling_url
+      properties:
+        call_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: ["initiated"]
+        participants:
+          type: array
+          items:
+            type: string
+            format: uuid
+        type:
+          type: string
+          enum: ["audio", "video"]
+        signaling_url:
+          type: string
+          description: WebSocket URL for signaling
+
+    CallJoinResponse:
+      type: object
+      required:
+        - call_id
+        - status
+        - signaling_url
+      properties:
+        call_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: ["joined"]
+        signaling_url:
+          type: string
+
+    CallInfo:
+      type: object
+      required:
+        - id
+        - caller_id
+        - participants
+        - type
+        - status
+        - started_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        caller_id:
+          type: string
+          format: uuid
+        participants:
+          type: array
+          items:
+            type: string
+            format: uuid
+        type:
+          type: string
+          enum: ["audio", "video"]
+        status:
+          type: string
+          enum: ["initiating", "ringing", "ongoing", "ended", "missed", "declined", "failed"]
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ActiveCallsResponse:
+      type: object
+      required:
+        - active_calls
+      properties:
+        active_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallInfo'
+
+    CallLog:
+      type: object
+      required:
+        - id
+        - conversation_id
+        - caller_id
+        - callee_id
+        - call_type
+        - status
+        - started_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        conversation_id:
+          type: string
+          format: uuid
+        caller_id:
+          type: string
+          format: uuid
+        callee_id:
+          type: string
+          format: uuid
+        call_type:
+          type: string
+          enum: ["audio", "video"]
+        status:
+          type: string
+          enum: ["ended", "missed", "declined", "failed"]
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+          nullable: true
+        duration:
+          type: integer
+          nullable: true
+          description: Call duration in seconds
+        call_metadata:
+          type: object
+          nullable: true
+          description: Additional call quality and metadata
+
+    CallHistoryResponse:
+      type: object
+      required:
+        - data
+        - count
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CallLog'
+        count:
+          type: integer
+
+    Message:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+```
+
+---
+
+## WebSocket Message Formats
+
+### Message WebSocket Events
+
+**Authentication:**
+```json
+{
+  "type": "auth",
+  "token": "jwt_token_here"
+}
+```
+
+**Join Conversation:**
+```json
+{
+  "type": "join_conversation",
+  "conversation_id": "conversation_uuid"
+}
+```
+
+**Send Message:**
+```json
+{
+  "type": "send_message",
+  "conversation_id": "conversation_uuid",
+  "ciphertext": "encrypted_content",
+  "message_type": "text",
+  "recipient_keys": [...]
+}
+```
+
+**Incoming Message:**
+```json
+{
+  "type": "message_received",
+  "data": {
+    "message": {...},
+    "conversation_id": "conversation_uuid"
+  }
+}
+```
+
+### Call WebSocket Signaling
+
+**SDP Offer:**
+```json
+{
+  "type": "offer",
+  "sdp": "offer_sdp_content",
+  "user_id": "sender_uuid"
+}
+```
+
+**SDP Answer:**
+```json
+{
+  "type": "answer",
+  "sdp": "answer_sdp_content", 
+  "user_id": "sender_uuid"
+}
+```
+
+**ICE Candidate:**
+```json
+{
+  "type": "ice-candidate",
+  "candidate": "ice_candidate_string",
+  "user_id": "sender_uuid"
+}
+```
+
+**Mute/Unmute:**
+```json
+{
+  "type": "mute",
+  "user_id": "sender_uuid",
+  "muted": true
+}
+```
+
+**Video Toggle:**
+```json
+{
+  "type": "video_toggle",
+  "user_id": "sender_uuid",
+  "video_enabled": false
+}
+```
+
+This OpenAPI specification provides a complete technical reference for all chat messaging and video call functionality in your E2E encrypted chat backend.

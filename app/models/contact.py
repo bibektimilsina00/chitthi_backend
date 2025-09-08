@@ -37,14 +37,6 @@ class Block(BlockBase, table=True):
     blocked_id: uuid.UUID = Field(foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # Relationships
-    blocker: "User" = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Block.blocker_id]"}
-    )
-    blocked: "User" = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[Block.blocked_id]"}
-    )
-
 
 class ContactPermissions(ContactPermissionBase, table=True):
     """Contact permissions database model"""
@@ -54,11 +46,3 @@ class ContactPermissions(ContactPermissionBase, table=True):
     contact_user_id: uuid.UUID = Field(foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: Optional[datetime] = Field(default=None)
-
-    # Relationships
-    user: "User" = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[ContactPermissions.user_id]"}
-    )
-    contact_user: "User" = Relationship(
-        sa_relationship_kwargs={"foreign_keys": "[ContactPermissions.contact_user_id]"}
-    )

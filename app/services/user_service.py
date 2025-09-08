@@ -47,5 +47,25 @@ class UserService:
     def count_users(session: Session) -> int:
         return crud.user.count(session=session)
 
+    @staticmethod
+    def search_users(
+        session: Session,
+        *,
+        search_term: str,
+        skip: int = 0,
+        limit: int = 20,
+        exclude_user_id: uuid.UUID | None = None,
+    ) -> list[User]:
+        """
+        Search users by username, display_name, or email.
+        """
+        return crud.user.search_users(
+            session=session,
+            search_term=search_term,
+            skip=skip,
+            limit=limit,
+            exclude_user_id=exclude_user_id,
+        )
+
 
 user_service = UserService()

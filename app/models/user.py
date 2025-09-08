@@ -40,7 +40,9 @@ class User(UserBase, table=True):
         back_populates="creator", cascade_delete=True
     )
     contacts: list["Contact"] = Relationship(
-        back_populates="owner", cascade_delete=True
+        back_populates="owner",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "[Contact.owner_id]"},
     )
 
 
