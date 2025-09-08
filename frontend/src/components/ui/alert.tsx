@@ -8,7 +8,8 @@ import {
 } from "@heroicons/react/20/solid";
 
 export interface AlertProps {
-  type?: "success" | "error" | "warning" | "info";
+  variant?: "success" | "error" | "warning" | "info";
+  type?: "success" | "error" | "warning" | "info"; // Keep for backward compatibility
   title?: string;
   children: ReactNode;
   onClose?: () => void;
@@ -50,14 +51,17 @@ const iconComponents = {
 };
 
 export default function Alert({
+  variant,
   type = "info",
   title,
   children,
   onClose,
   className = "",
 }: AlertProps) {
-  const styles = alertStyles[type];
-  const IconComponent = iconComponents[type];
+  // Use variant if provided, otherwise fall back to type
+  const alertType = variant || type;
+  const styles = alertStyles[alertType];
+  const IconComponent = iconComponents[alertType];
 
   return (
     <div className={`rounded-md border p-4 ${styles.container} ${className}`}>

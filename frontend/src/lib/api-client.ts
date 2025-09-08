@@ -1,6 +1,11 @@
-import axios, { AxiosInstance, AxiosError } from "axios";
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
 import { ApiConfig, HttpError } from "@/types/api";
+import { tokenManager } from "./token-manager";
+import { navigationService } from "./navigation";
 
+/**
+ * Enhanced API client with better error handling and token management
+ */
 class ApiClient {
   private client: AxiosInstance;
 
@@ -13,94 +18,137 @@ class ApiClient {
       },
     });
 
+    this.setupInterceptors();
+  }
+
+  private setupInterceptors() {
     // Request interceptor to add auth token
     this.client.interceptors.request.use(
       (config) => {
-        const token = this.getToken();
+        const token = tokenManager.getValidToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
-      (error) => Promise.reject(error)
+      (error) => Promise.reject(this.createHttpError(error))
     );
 
-    // Response interceptor for error handling
+    // Response interceptor for error handling and token refresh
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError) => {
-        const httpError: HttpError = new Error(error.message) as HttpError;
-        httpError.status = error.response?.status || 0;
-        httpError.statusText = error.response?.statusText || "";
-        httpError.data = error.response?.data;
+      async (error: AxiosError) => {
+        const originalRequest = error.config as AxiosRequestConfig & {
+          _retry?: boolean;
+        };
 
-        // Handle 401 errors by removing token and redirecting to login
-        if (httpError.status === 401) {
-          this.removeToken();
-          window.location.href = "/login";
+        // Handle 401 errors
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
+
+          // Remove invalid token
+          tokenManager.removeToken();
+
+          // Redirect to login if navigation is available
+          if (navigationService.isAvailable()) {
+            navigationService.navigateToLogin();
+          }
+
+          return Promise.reject(this.createHttpError(error));
         }
 
-        return Promise.reject(httpError);
+        return Promise.reject(this.createHttpError(error));
       }
     );
   }
 
-  private getToken(): string | null {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("auth_token");
-    }
-    return null;
+  private createHttpError(error: AxiosError): HttpError {
+    const httpError = new Error(error.message) as HttpError;
+    httpError.status = error.response?.status || 0;
+    httpError.statusText = error.response?.statusText || "";
+    httpError.data = error.response?.data;
+    return httpError;
   }
 
-  public setToken(token: string): void {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("auth_token", token);
-    }
+  // HTTP Methods
+  public async get<T>(
+    url: string,
+    params?: Record<string, unknown>
+  ): Promise<T> {
+    const response = await this.client.get(url, { params });
+    return response.data;
   }
 
-  public removeToken(): void {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("auth_token");
-    }
+  public async post<T>(url: string, data?: unknown): Promise<T> {
+    const response = await this.client.post(url, data);
+    return response.data;
   }
 
-  public get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-    return this.client.get(url, { params }).then((response) => response.data);
+  public async patch<T>(url: string, data?: unknown): Promise<T> {
+    const response = await this.client.patch(url, data);
+    return response.data;
   }
 
-  public post<T>(url: string, data?: unknown): Promise<T> {
-    return this.client.post(url, data).then((response) => response.data);
+  public async put<T>(url: string, data?: unknown): Promise<T> {
+    const response = await this.client.put(url, data);
+    return response.data;
   }
 
-  public patch<T>(url: string, data?: unknown): Promise<T> {
-    return this.client.patch(url, data).then((response) => response.data);
+  public async delete<T>(url: string): Promise<T> {
+    const response = await this.client.delete(url);
+    return response.data;
   }
 
-  public delete<T>(url: string): Promise<T> {
-    return this.client.delete(url).then((response) => response.data);
-  }
-
-  // Special method for form data (login endpoint)
-  public postForm<T>(url: string, data: Record<string, string>): Promise<T> {
+  // Special method for form data (OAuth2 endpoints)
+  public async postForm<T>(
+    url: string,
+    data: Record<string, string>
+  ): Promise<T> {
     const formData = new URLSearchParams();
     Object.entries(data).forEach(([key, value]) => {
       formData.append(key, value);
     });
 
-    return this.client
-      .post(url, formData, {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-      })
-      .then((response) => response.data);
+    const response = await this.client.post(url, formData, {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    return response.data;
+  }
+
+  // Method for file uploads
+  public async postFile<T>(url: string, formData: FormData): Promise<T> {
+    const response = await this.client.post(url, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    return response.data;
+  }
+
+  // Get the base URL for external use
+  public getBaseURL(): string {
+    return this.client.defaults.baseURL || "";
+  }
+
+  // Method to update configuration
+  public updateConfig(config: Partial<ApiConfig>): void {
+    if (config.baseURL) {
+      this.client.defaults.baseURL = config.baseURL;
+    }
+    if (config.timeout) {
+      this.client.defaults.timeout = config.timeout;
+    }
   }
 }
 
-// Create and export a singleton instance
+// Create and export singleton instance
 const apiClient = new ApiClient({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1",
-  timeout: 10000,
+  timeout: 30000, // Increased timeout for better UX
 });
 
 export default apiClient;

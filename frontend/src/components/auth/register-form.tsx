@@ -44,11 +44,23 @@ export default function RegisterForm() {
       const { confirmPassword, ...registerData } = data;
 
       // Convert empty strings to undefined for optional fields
-      const cleanedData = {
-        ...registerData,
-        email: registerData.email || undefined,
-        display_name: registerData.display_name || undefined,
+      const cleanedData: {
+        username: string;
+        password: string;
+        email?: string;
+        display_name?: string;
+      } = {
+        username: registerData.username,
+        password: registerData.password,
       };
+
+      if (registerData.email) {
+        cleanedData.email = registerData.email;
+      }
+
+      if (registerData.display_name) {
+        cleanedData.display_name = registerData.display_name;
+      }
 
       await registerUser(cleanedData);
 

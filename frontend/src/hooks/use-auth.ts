@@ -1,11 +1,21 @@
 import useSWR from "swr";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { authService } from "@/lib/auth";
+import { navigationService } from "@/lib/navigation";
 import { User } from "@/types/auth";
 
 /**
  * Hook to get current authenticated user
  */
 export function useAuth() {
+  const router = useRouter();
+
+  // Set router for navigation service
+  useEffect(() => {
+    navigationService.setRouter(router);
+  }, [router]);
+
   const {
     data: user,
     error,
@@ -53,8 +63,8 @@ export function useAuthActions() {
     authService.logout();
     // Clear the SWR cache for user data
     mutate(undefined, false);
-    // Redirect to login page
-    window.location.href = "/login";
+    // Navigate to login page using navigation service
+    navigationService.navigateToLogin();
   };
 
   const register = async (userData: {

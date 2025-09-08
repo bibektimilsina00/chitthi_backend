@@ -5,9 +5,9 @@ export interface LoginCredentials {
 
 export interface RegisterData {
   username: string;
-  email?: string;
+  email?: string | undefined;
   password: string;
-  display_name?: string;
+  display_name?: string | undefined;
 }
 
 export interface Token {

@@ -1,4 +1,5 @@
 import apiClient from "./api-client";
+import { tokenManager } from "./token-manager";
 import {
   LoginCredentials,
   RegisterData,
@@ -20,8 +21,8 @@ export class AuthService {
       password: credentials.password,
     });
 
-    // Store the token
-    apiClient.setToken(token.access_token);
+    // Store the token using token manager
+    tokenManager.setToken(token.access_token);
 
     return token;
   }
@@ -74,23 +75,36 @@ export class AuthService {
    * Logout - remove token from storage
    */
   logout(): void {
-    apiClient.removeToken();
+    tokenManager.removeToken();
   }
 
   /**
    * Check if user is authenticated
    */
   isAuthenticated(): boolean {
-    if (typeof window === "undefined") return false;
-    return !!localStorage.getItem("auth_token");
+    return tokenManager.isAuthenticated();
   }
 
   /**
    * Get stored token
    */
   getToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("auth_token");
+    return tokenManager.getValidToken();
+  }
+
+  /**
+   * Check if token is expiring soon
+   */
+  isTokenExpiringSoon(): boolean {
+    return tokenManager.isTokenExpiringSoon();
+  }
+
+  /**
+   * Get user ID from token payload
+   */
+  getUserIdFromToken(): string | null {
+    const payload = tokenManager.getTokenPayload();
+    return (payload?.sub as string) || null;
   }
 }
 

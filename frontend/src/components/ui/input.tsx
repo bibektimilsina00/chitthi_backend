@@ -3,7 +3,7 @@ import { ExclamationCircleIcon } from "@heroicons/react/20/solid";
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
-  error?: string;
+  error?: string | undefined;
   helperText?: string;
 }
 
