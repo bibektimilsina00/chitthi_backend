@@ -5,12 +5,18 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.api.deps import CurrentUser, SessionDep
 from app.schemas.common import Message
 
 router = APIRouter()
+
+
+class CallInitiateRequest(BaseModel):
+    participants: List[str]
+    call_type: str = "audio"
 
 
 class CallManager:
@@ -88,17 +94,15 @@ call_manager = CallManager()
 
 @router.post("/initiate")
 def initiate_call(
+    request: CallInitiateRequest,
     session: SessionDep,
     current_user: CurrentUser,
-    participants: List[str],
-    call_type: str = "audio",
 ) -> Any:
     """
     Initiate an audio or video call.
 
     Args:
-        participants: List of user IDs to include in the call
-        call_type: "audio" or "video"
+        request: CallInitiateRequest containing participants and call_type
     """
     # Check if current user is already in a call
     existing_call = call_manager.get_user_active_call(str(current_user.id))
@@ -109,13 +113,13 @@ def initiate_call(
     # In production, add proper validation
 
     call_id = str(uuid.uuid4())
-    all_participants = [str(current_user.id)] + participants
+    all_participants = [str(current_user.id)] + request.participants
 
     call_info = call_manager.create_call(
         call_id=call_id,
         caller_id=str(current_user.id),
         participants=all_participants,
-        call_type=call_type,
+        call_type=request.call_type,
     )
 
     # In production, send push notifications to participants
@@ -125,7 +129,7 @@ def initiate_call(
         "call_id": call_id,
         "status": "initiated",
         "participants": all_participants,
-        "type": call_type,
+        "type": request.call_type,
         "signaling_url": f"/api/v1/calls/{call_id}/signaling",
     }
 
@@ -198,21 +202,34 @@ async def call_signaling_websocket(websocket: WebSocket, call_id: str):
     - ICE candidates
     - Call control messages
     """
-    await websocket.accept()
+    try:
+        await websocket.accept()
 
-    # Validate call exists
-    call_info = call_manager.get_call(call_id)
-    if not call_info:
-        await websocket.close(code=4004, reason="Call not found")
+        # Validate call exists
+        call_info = call_manager.get_call(call_id)
+        if not call_info:
+            await websocket.close(code=4004, reason="Call not found")
+            return
+
+        call_manager.add_connection(call_id, websocket)
+    except Exception as e:
+        print(f"WebSocket connection failed: {e}")
+        try:
+            await websocket.close(code=4000, reason="Connection failed")
+        except:
+            pass
         return
-
-    call_manager.add_connection(call_id, websocket)
 
     try:
         while True:
             # Receive signaling message
             data = await websocket.receive_text()
-            message = eval(data)  # In production, use json.loads with proper validation
+            import json
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError:
+                print(f"Invalid JSON received: {data}")
+                continue
 
             message_type = message.get("type")
 

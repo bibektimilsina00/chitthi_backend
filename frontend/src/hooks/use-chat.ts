@@ -395,7 +395,8 @@ export function useChat() {
     messages,
     currentConversationId,
     currentConversation:
-      conversations.find((c: Conversation) => c.id === currentConversationId) || null,
+      conversations.find((c: Conversation) => c.id === currentConversationId) ||
+      null,
     typingUsers,
     isLoading: conversationsLoading || messagesLoading,
     isConnected,

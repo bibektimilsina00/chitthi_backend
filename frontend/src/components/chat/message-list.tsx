@@ -2,7 +2,12 @@ import React, { useEffect, useRef } from "react";
 import { CheckIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Message } from "@/types/chat";
 import { useAuth } from "@/hooks/use-auth";
-import { hasAttachments, getMessageAttachments, formatFileSize } from "@/lib/message-utils";
+import {
+  hasAttachments,
+  getMessageAttachments,
+  formatFileSize,
+} from "@/lib/message-utils";
+import { getMessageDisplayContent } from "@/lib/message-decryption";
 
 // Custom double check icon since it's not in heroicons
 function DoubleCheckIcon({ className }: { className?: string }) {
@@ -219,18 +224,20 @@ interface MessageContentProps {
 
 function MessageContent({ message }: MessageContentProps) {
   const attachments = getMessageAttachments(message);
-  
+
   // Try to decode mock messages for development, otherwise show encrypted placeholder
   const getDisplayContent = () => {
+    // Use the new decryption utility for text messages
+    if (message.message_type === "text") {
+      return getMessageDisplayContent(
+        message.ciphertext,
+        message.message_type,
+        message.encryption_algo
+      );
+    }
+
+    // Keep existing logic for other message types
     switch (message.message_type) {
-      case "text":
-        // For now, display the ciphertext as is (in real app, this would be decrypted)
-        // If ciphertext looks like plain text (for testing), show it directly
-        if (message.ciphertext && !message.ciphertext.startsWith("encrypted_") && message.ciphertext.length < 100) {
-          return message.ciphertext;
-        }
-        // Otherwise show as encrypted message
-        return "[Encrypted Message]";
       case "image":
         return (
           <div className="flex items-center space-x-2 text-sm">

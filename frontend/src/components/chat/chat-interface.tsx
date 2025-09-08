@@ -9,13 +9,16 @@ import {
 import { ConversationList } from "./conversation-list";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
+import { VideoCall } from "@/components/calls/video-call";
 import { useChat } from "@/hooks/use-chat";
+import { useCalls } from "@/hooks/use-calls";
 import { ConversationCreate } from "@/types/chat";
 
 export function ChatInterface() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewConversationModal, setShowNewConversationModal] =
     useState(false);
+  const [showVideoCall, setShowVideoCall] = useState(false);
 
   const {
     conversations,
@@ -28,6 +31,15 @@ export function ChatInterface() {
     createConversation,
     sendMessage,
   } = useChat();
+
+  const {
+    callState,
+    isCallActive,
+    isIncomingCall,
+    initiateCall,
+    error: callError,
+    clearError: clearCallError,
+  } = useCalls();
 
   const filteredConversations = conversations.filter(
     (conv) =>
@@ -45,8 +57,46 @@ export function ChatInterface() {
     }
   };
 
+  const handleInitiateCall = async (callType: "audio" | "video") => {
+    if (!currentConversation) return;
+
+    try {
+      clearCallError();
+      // For now, use conversation participants. In a real app, you'd get this from the conversation members
+      const participants = ["sample-user-id"]; // This should be replaced with actual conversation participants
+      await initiateCall(participants, callType);
+      setShowVideoCall(true);
+    } catch (error) {
+      console.error(`Failed to initiate ${callType} call:`, error);
+    }
+  };
+
+  const handleCloseCall = () => {
+    setShowVideoCall(false);
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Error notification */}
+      {callError && (
+        <div className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+          <div className="flex items-center justify-between">
+            <span>{callError}</span>
+            <button
+              onClick={clearCallError}
+              className="ml-2 text-white hover:text-gray-200"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Video Call Modal */}
+      {(showVideoCall || isCallActive || isIncomingCall) && (
+        <VideoCall callId={callState.callId} onClose={handleCloseCall} />
+      )}
+
       {/* Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         {/* Header */}
@@ -127,12 +177,14 @@ export function ChatInterface() {
                 {/* Action buttons */}
                 <div className="flex items-center space-x-2">
                   <button
+                    onClick={() => handleInitiateCall("audio")}
                     className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                     title="Voice call"
                   >
                     <PhoneIcon className="w-5 h-5" />
                   </button>
                   <button
+                    onClick={() => handleInitiateCall("video")}
                     className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
                     title="Video call"
                   >
