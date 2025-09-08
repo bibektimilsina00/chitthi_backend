@@ -1,3 +1,18 @@
+// User types
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  display_name?: string;
+  is_active: boolean;
+  is_superuser: boolean;
+}
+
+export interface UsersResponse {
+  data: User[];
+  count: number;
+}
+
 // Message types
 export interface Message {
   id: string;
@@ -79,6 +94,8 @@ export interface Conversation {
   archived: boolean;
   created_at: string;
   updated_at: string;
+  participants?: User[];
+  other_participants?: User[];
 }
 
 export type ConversationType = "direct" | "group" | "channel" | "support";

@@ -93,7 +93,7 @@ call_manager = CallManager()
 
 
 @router.post("/initiate")
-def initiate_call(
+async def initiate_call(
     request: CallInitiateRequest,
     session: SessionDep,
     current_user: CurrentUser,
@@ -104,6 +104,9 @@ def initiate_call(
     Args:
         request: CallInitiateRequest containing participants and call_type
     """
+    # Import the WebSocket manager
+    from app.api.routes.websocket import manager
+    
     # Check if current user is already in a call
     existing_call = call_manager.get_user_active_call(str(current_user.id))
     if existing_call:
@@ -122,8 +125,19 @@ def initiate_call(
         call_type=request.call_type,
     )
 
-    # In production, send push notifications to participants
-    # For now, just return call info
+    # Send incoming call notifications to other participants via WebSocket
+    call_notification = {
+        "type": "incoming_call",
+        "call_id": call_id,
+        "caller_id": str(current_user.id),
+        "caller_name": current_user.display_name or current_user.username,
+        "call_type": request.call_type,
+        "signaling_url": f"/api/v1/calls/{call_id}/signaling",
+    }
+    
+    # Notify all participants except the caller
+    for participant_id in request.participants:
+        await manager.send_to_all_user_devices(call_notification, participant_id)
 
     return {
         "call_id": call_id,

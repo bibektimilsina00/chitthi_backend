@@ -13,6 +13,7 @@ from app.schemas.conversation import (
     ConversationPublic,
     ConversationsPublic,
     ConversationUpdate,
+    ConversationWithParticipants,
 )
 from app.services import conversation_service
 
@@ -29,13 +30,13 @@ def read_conversations(
     """
     Retrieve conversations for current user.
     """
-    conversations = conversation_service.get_user_conversations(
+    conversations_data = conversation_service.get_user_conversations(
         session=session, user_id=current_user.id, skip=skip, limit=limit
     )
     # For now, just use length of conversations as count
-    count = len(conversations)
+    count = len(conversations_data)
     conversations_public = [
-        ConversationPublic.model_validate(conv) for conv in conversations
+        ConversationWithParticipants.model_validate(conv) for conv in conversations_data
     ]
     return ConversationsPublic(data=conversations_public, count=count)
 
@@ -55,6 +56,114 @@ def create_conversation(
     )
 
     return ConversationPublic.model_validate(conversation)
+
+
+@router.post("/direct/{user_id}", response_model=ConversationWithParticipants)
+def create_direct_conversation(
+    *,
+    session: SessionDep,
+    current_user: CurrentUser,
+    user_id: uuid.UUID,
+) -> Any:
+    """
+    Create or get existing direct conversation with a specific user.
+    """
+    from app import crud
+    from app.schemas.user import UserPublic
+    
+    # Check if user exists
+    target_user = crud.user.get(session=session, id=user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check if direct conversation already exists between these users
+    existing_conv = conversation_service.get_direct_conversation(
+        session=session, user1_id=current_user.id, user2_id=user_id
+    )
+    
+    if existing_conv:
+        # Return existing conversation with participant info
+        members = crud.conversation_member.get_conversation_members_with_users(
+            session, conversation_id=existing_conv.id
+        )
+        
+        participants = []
+        other_participants = []
+        
+        for member in members:
+            if member.user:
+                user_public = UserPublic.model_validate(member.user)
+                participants.append(user_public)
+                if member.user_id != current_user.id:
+                    other_participants.append(user_public)
+        
+        conv_dict = {
+            "id": existing_conv.id,
+            "type": existing_conv.type,
+            "title": existing_conv.title,
+            "topic": existing_conv.topic,
+            "avatar_url": existing_conv.avatar_url,
+            "visibility": existing_conv.visibility,
+            "archived": existing_conv.archived,
+            "conv_metadata": existing_conv.conv_metadata,
+            "creator_id": existing_conv.creator_id,
+            "member_count": existing_conv.member_count,
+            "last_message_id": existing_conv.last_message_id,
+            "created_at": existing_conv.created_at,
+            "updated_at": existing_conv.updated_at,
+            "participants": participants,
+            "other_participants": other_participants,
+        }
+        return ConversationWithParticipants.model_validate(conv_dict)
+    
+    # Create new direct conversation
+    conversation_create = ConversationCreate(
+        type="direct",
+        visibility="private",
+        creator_id=current_user.id
+    )
+    
+    conversation = conversation_service.create_conversation(
+        session=session,
+        conversation_create=conversation_create,
+        creator_id=current_user.id,
+        initial_members=[user_id]
+    )
+    
+    # Load participant info for response
+    members = crud.conversation_member.get_conversation_members_with_users(
+        session, conversation_id=conversation.id
+    )
+    
+    participants = []
+    other_participants = []
+    
+    for member in members:
+        if member.user:
+            user_public = UserPublic.model_validate(member.user)
+            participants.append(user_public)
+            if member.user_id != current_user.id:
+                other_participants.append(user_public)
+    
+    conv_dict = {
+        "id": conversation.id,
+        "type": conversation.type,
+        "title": conversation.title,
+        "topic": conversation.topic,
+        "avatar_url": conversation.avatar_url,
+        "visibility": conversation.visibility,
+        "archived": conversation.archived,
+        "conv_metadata": conversation.conv_metadata,
+        "creator_id": conversation.creator_id,
+        "member_count": conversation.member_count,
+        "last_message_id": conversation.last_message_id,
+        "created_at": conversation.created_at,
+        "updated_at": conversation.updated_at,
+        "participants": participants,
+        "other_participants": other_participants,
+    }
+    
+    return ConversationWithParticipants.model_validate(conv_dict)
 
 
 @router.get("/{id}", response_model=ConversationPublic)

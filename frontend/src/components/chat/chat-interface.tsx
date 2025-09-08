@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   PlusIcon,
   MagnifyingGlassIcon,
@@ -10,9 +10,10 @@ import { ConversationList } from "./conversation-list";
 import { MessageList } from "./message-list";
 import { MessageInput } from "./message-input";
 import { VideoCall } from "@/components/calls/video-call";
-import { useChat } from "@/hooks/use-chat";
-import { useCalls } from "@/hooks/use-calls";
-import { ConversationCreate } from "@/types/chat";
+import { useChat, useWebSocket } from "@/hooks/use-chat";
+import { useCalls, useIncomingCalls } from "@/hooks/use-calls";
+import { ConversationCreate, User, WebSocketMessage } from "@/types/chat";
+import { usersApi, conversationsApi } from "@/lib/chat-api";
 
 export function ChatInterface() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,7 +31,10 @@ export function ChatInterface() {
     selectConversation,
     createConversation,
     sendMessage,
+    refreshConversations,
   } = useChat();
+
+  const { addEventListener, removeEventListener } = useWebSocket();
 
   const {
     callState,
@@ -40,6 +44,88 @@ export function ChatInterface() {
     error: callError,
     clearError: clearCallError,
   } = useCalls();
+
+  const { incomingCall, handleIncomingCall, clearIncomingCall } =
+    useIncomingCalls();
+
+  // Handle incoming call notifications from WebSocket
+  useEffect(() => {
+    const handleIncomingCallEvent = (event: WebSocketMessage) => {
+      console.log("📞 ChatInterface: Incoming call event received", event);
+      console.log("📞 ChatInterface: event.data type:", typeof event.data);
+      console.log("📞 ChatInterface: event.data value:", event.data);
+
+      const data = event.data as {
+        type: string;
+        call_id: string;
+        caller_id: string;
+        caller_name?: string;
+        call_type: "audio" | "video";
+      };
+
+      console.log("📞 ChatInterface: Parsed data:", data);
+      console.log("📞 ChatInterface: data.type:", data?.type);
+      console.log(
+        "📞 ChatInterface: Checking condition:",
+        data && data.type === "incoming_call"
+      );
+
+      if (data && data.type === "incoming_call") {
+        console.log("📞 ChatInterface: Processing incoming call:", data);
+        console.log("📞 ChatInterface: Current callState before:", callState);
+        console.log(
+          "📞 ChatInterface: Current isIncomingCall before:",
+          isIncomingCall
+        );
+
+        console.log("📞 ChatInterface: About to call handleIncomingCall");
+        console.log(
+          "📞 ChatInterface: handleIncomingCall function:",
+          handleIncomingCall
+        );
+
+        try {
+          handleIncomingCall(data.call_id, data.caller_id, data.call_type);
+          console.log(
+            "📞 ChatInterface: handleIncomingCall completed successfully"
+          );
+        } catch (error) {
+          console.error(
+            "📞 ChatInterface: Error calling handleIncomingCall:",
+            error
+          );
+        }
+
+        // Force show video call for debugging
+        console.log("📞 ChatInterface: Setting showVideoCall to true");
+        setShowVideoCall(true);
+
+        // Log state after a brief delay to see if it updates
+        setTimeout(() => {
+          console.log(
+            "📞 ChatInterface: Call state after handling:",
+            callState
+          );
+          console.log(
+            "📞 ChatInterface: isIncomingCall after handling:",
+            isIncomingCall
+          );
+        }, 100);
+      }
+    };
+
+    addEventListener("incoming_call", handleIncomingCallEvent);
+
+    return () => {
+      removeEventListener("incoming_call", handleIncomingCallEvent);
+    };
+  }, [
+    addEventListener,
+    removeEventListener,
+    handleIncomingCall,
+    callState,
+    isIncomingCall,
+  ]);
 
   const filteredConversations = conversations.filter(
     (conv) =>
@@ -62,8 +148,28 @@ export function ChatInterface() {
 
     try {
       clearCallError();
-      // For now, use conversation participants. In a real app, you'd get this from the conversation members
-      const participants = ["sample-user-id"]; // This should be replaced with actual conversation participants
+
+      // Get actual conversation participants (excluding current user)
+      let participants: string[] = [];
+
+      if (
+        currentConversation.other_participants &&
+        currentConversation.other_participants.length > 0
+      ) {
+        participants = currentConversation.other_participants.map(
+          (user) => user.id
+        );
+      } else {
+        console.warn("No participants found for call");
+        return;
+      }
+
+      console.log(
+        "Initiating call with participants:",
+        participants,
+        "type:",
+        callType
+      );
       await initiateCall(participants, callType);
       setShowVideoCall(true);
     } catch (error) {
@@ -71,12 +177,63 @@ export function ChatInterface() {
     }
   };
 
+  const getConversationDisplayName = (
+    conversation: typeof currentConversation
+  ) => {
+    if (conversation?.title) {
+      return conversation.title;
+    }
+
+    if (
+      conversation?.type === "direct" &&
+      conversation.other_participants &&
+      conversation.other_participants.length > 0
+    ) {
+      const otherUser = conversation.other_participants[0];
+      return otherUser?.display_name || otherUser?.username;
+    }
+
+    if (conversation?.type === "group") {
+      return `Group (${conversation.member_count} members)`;
+    }
+
+    return "Untitled Conversation";
+  };
+
+  const getConversationSubtitle = (
+    conversation: typeof currentConversation
+  ) => {
+    if (conversation?.type === "group") {
+      return `${conversation.member_count} members`;
+    } else if (
+      conversation?.type === "direct" &&
+      conversation.other_participants &&
+      conversation.other_participants.length > 0
+    ) {
+      return "Direct message";
+    }
+    return "Direct message";
+  };
+
   const handleCloseCall = () => {
     setShowVideoCall(false);
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-full bg-gray-50">
+      {/* Debug info - Always visible */}
+      <div className="fixed top-4 right-4 bg-black text-white p-2 rounded z-50 text-xs">
+        showVideoCall: {showVideoCall.toString()}
+        <br />
+        isCallActive: {isCallActive.toString()}
+        <br />
+        isIncomingCall: {isIncomingCall.toString()}
+        <br />
+        callId: {callState.callId || "none"}
+        <br />
+        incomingCall: {incomingCall ? "yes" : "no"}
+      </div>
+
       {/* Error notification */}
       {callError && (
         <div className="fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
@@ -158,18 +315,17 @@ export function ChatInterface() {
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
                     <span className="text-white font-medium">
-                      {currentConversation.title?.charAt(0).toUpperCase() ||
-                        "C"}
+                      {getConversationDisplayName(currentConversation)
+                        ?.charAt(0)
+                        .toUpperCase() || "C"}
                     </span>
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">
-                      {currentConversation.title || "Untitled Conversation"}
+                      {getConversationDisplayName(currentConversation)}
                     </h2>
                     <p className="text-sm text-gray-500">
-                      {currentConversation.type === "group"
-                        ? `${currentConversation.member_count} members`
-                        : "Direct message"}
+                      {getConversationSubtitle(currentConversation)}
                     </p>
                   </div>
                 </div>
@@ -244,6 +400,8 @@ export function ChatInterface() {
         <NewConversationModal
           onClose={() => setShowNewConversationModal(false)}
           onCreateConversation={handleCreateConversation}
+          selectConversation={selectConversation}
+          refreshConversations={refreshConversations}
         />
       )}
     </div>
@@ -253,28 +411,92 @@ export function ChatInterface() {
 interface NewConversationModalProps {
   onClose: () => void;
   onCreateConversation: (data: ConversationCreate) => void;
+  selectConversation: (conversationId: string) => void;
+  refreshConversations: () => Promise<unknown>;
 }
 
 function NewConversationModal({
   onClose,
   onCreateConversation,
+  selectConversation,
+  refreshConversations,
 }: NewConversationModalProps) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState<"direct" | "group">("direct");
-  const [participants, setParticipants] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<User[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await usersApi.searchUsers(query.trim());
+      setSearchResults(response.data);
+    } catch (error) {
+      console.error("Failed to search users:", error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleUserSelect = (user: User) => {
+    if (type === "direct") {
+      // For direct messages, create conversation immediately
+      handleCreateDirectConversation(user);
+    } else {
+      // For group chats, add to selected users
+      if (!selectedUsers.find((u) => u.id === user.id)) {
+        setSelectedUsers([...selectedUsers, user]);
+      }
+      setSearchQuery("");
+      setSearchResults([]);
+    }
+  };
+
+  const handleCreateDirectConversation = async (user: User) => {
+    try {
+      const conversation = await conversationsApi.createDirectConversation(
+        user.id
+      );
+      // Refresh the conversations list to include the new conversation
+      await refreshConversations();
+      // Navigate to the new conversation
+      selectConversation(conversation.id);
+      // Close the modal
+      onClose();
+    } catch (error) {
+      console.error("Failed to create direct conversation:", error);
+    }
+  };
+
+  const handleRemoveUser = (userId: string) => {
+    setSelectedUsers(selectedUsers.filter((u) => u.id !== userId));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const participantList = participants
-      .split(",")
-      .map((p) => p.trim())
-      .filter((p) => p.length > 0);
+    if (type === "direct") {
+      // This shouldn't happen as direct conversations are created immediately
+      return;
+    }
+
+    if (selectedUsers.length === 0) {
+      return;
+    }
 
     const conversationData: ConversationCreate = {
       type,
       visibility: "private",
-      participants: participantList,
+      participants: selectedUsers.map((u) => u.id),
     };
 
     if (title.trim()) {
@@ -284,58 +506,156 @@ function NewConversationModal({
     onCreateConversation(conversationData);
   };
 
+  const getDisplayName = (user: User) => {
+    return user.display_name || user.username;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          Create New Conversation
+          {type === "direct" ? "Start New Chat" : "Create Group Chat"}
         </h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Chat type selector */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Conversation Title (optional)
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Chat Type
             </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter conversation title..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setType("direct");
+                  setSelectedUsers([]);
+                  setTitle("");
+                }}
+                className={`px-3 py-2 text-sm rounded-md border ${
+                  type === "direct"
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-gray-50 border-gray-200 text-gray-700"
+                }`}
+              >
+                Direct Message
+              </button>
+              <button
+                type="button"
+                onClick={() => setType("group")}
+                className={`px-3 py-2 text-sm rounded-md border ${
+                  type === "group"
+                    ? "bg-blue-50 border-blue-200 text-blue-700"
+                    : "bg-gray-50 border-gray-200 text-gray-700"
+                }`}
+              >
+                Group Chat
+              </button>
+            </div>
           </div>
 
+          {/* Group title (only for group chats) */}
+          {type === "group" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Group Name
+              </label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter group name..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          )}
+
+          {/* User search */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type
+              {type === "direct" ? "Search User" : "Add Participants"}
             </label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value as "direct" | "group")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="direct">Direct Message</option>
-              <option value="group">Group Chat</option>
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="Search by username or email..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+            </div>
+
+            {/* Search results */}
+            {searchResults.length > 0 && (
+              <div className="mt-2 border border-gray-200 rounded-md max-h-40 overflow-y-auto">
+                {searchResults.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => handleUserSelect(user)}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-medium">
+                          {getDisplayName(user).charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {getDisplayName(user)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          @{user.username}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Participants (User IDs, comma-separated)
-            </label>
-            <textarea
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              placeholder="user1, user2, user3..."
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Enter the user IDs of people you want to add to this conversation
-            </p>
-          </div>
+          {/* Selected users (for group chats) */}
+          {type === "group" && selectedUsers.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Selected Participants ({selectedUsers.length})
+              </label>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {selectedUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between bg-gray-50 rounded-md px-3 py-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-gradient-to-br from-purple-400 to-pink-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-medium">
+                          {getDisplayName(user).charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-900">
+                        {getDisplayName(user)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveUser(user.id)}
+                      className="text-red-500 hover:text-red-700 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
               onClick={onClose}
@@ -343,13 +663,15 @@ function NewConversationModal({
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={participants.trim().length === 0}
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Create Conversation
-            </button>
+            {type === "group" && (
+              <button
+                type="submit"
+                disabled={selectedUsers.length === 0 || !title.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Create Group
+              </button>
+            )}
           </div>
         </form>
       </div>

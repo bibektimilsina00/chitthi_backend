@@ -63,13 +63,62 @@ class ConversationService:
         session.refresh(conversation)
         return conversation
 
+    def get_direct_conversation(
+        self, session: Session, *, user1_id: uuid.UUID, user2_id: uuid.UUID
+    ) -> Conversation | None:
+        """Find existing direct conversation between two users."""
+        return crud.conversation.get_direct_conversation(
+            session=session, user1_id=user1_id, user2_id=user2_id
+        )
+
     def get_user_conversations(
         self, session: Session, *, user_id: uuid.UUID, skip: int = 0, limit: int = 100
-    ) -> list[Conversation]:
-        """Get all conversations for a user."""
-        return crud.conversation.get_user_conversations(
+    ) -> list[dict]:
+        """Get all conversations for a user with participant information."""
+        from app.schemas.user import UserPublic
+        
+        conversations = crud.conversation.get_user_conversations(
             session, user_id=user_id, skip=skip, limit=limit
         )
+        
+        result = []
+        for conv in conversations:
+            # Get conversation members with user info
+            members = crud.conversation_member.get_conversation_members_with_users(
+                session, conversation_id=conv.id
+            )
+            
+            participants = []
+            other_participants = []
+            
+            for member in members:
+                if member.user:  # Make sure user is loaded
+                    user_public = UserPublic.model_validate(member.user)
+                    participants.append(user_public)
+                    if member.user_id != user_id:
+                        other_participants.append(user_public)
+            
+            # Convert conversation to dict and add participant info
+            conv_dict = {
+                "id": conv.id,
+                "type": conv.type,
+                "title": conv.title,
+                "topic": conv.topic,
+                "avatar_url": conv.avatar_url,
+                "visibility": conv.visibility,
+                "archived": conv.archived,
+                "conv_metadata": conv.conv_metadata,
+                "creator_id": conv.creator_id,
+                "member_count": conv.member_count,
+                "last_message_id": conv.last_message_id,
+                "created_at": conv.created_at,
+                "updated_at": conv.updated_at,
+                "participants": participants,
+                "other_participants": other_participants,
+            }
+            result.append(conv_dict)
+            
+        return result
 
     def add_member(
         self,

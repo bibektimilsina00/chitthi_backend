@@ -15,7 +15,32 @@ import {
   CallResponse,
   Device,
   DeviceCreate,
+  User,
+  UsersResponse,
 } from "@/types/chat";
+
+/**
+ * Users API service
+ */
+export const usersApi = {
+  // Search users
+  async searchUsers(
+    search: string,
+    skip = 0,
+    limit = 20
+  ): Promise<UsersResponse> {
+    return apiClient.get<UsersResponse>("/users/search", {
+      search,
+      skip,
+      limit,
+    });
+  },
+
+  // Get user by ID
+  async getUser(userId: string): Promise<User> {
+    return apiClient.get<User>(`/users/${userId}`);
+  },
+};
 
 /**
  * Conversations API service
@@ -35,6 +60,11 @@ export const conversationsApi = {
   // Create new conversation
   async createConversation(data: ConversationCreate): Promise<Conversation> {
     return apiClient.post<Conversation>("/conversations/", data);
+  },
+
+  // Create direct conversation with a specific user
+  async createDirectConversation(userId: string): Promise<Conversation> {
+    return apiClient.post<Conversation>(`/conversations/direct/${userId}`, {});
   },
 
   // Get conversation by ID

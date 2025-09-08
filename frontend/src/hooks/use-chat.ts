@@ -268,6 +268,7 @@ export function useChat() {
     conversations,
     isLoading: conversationsLoading,
     createConversation,
+    refreshConversations,
   } = useConversations();
   const {
     messages,
@@ -409,5 +410,6 @@ export function useChat() {
     saveDraft,
     clearDraft,
     getDraft,
+    refreshConversations,
   };
 }

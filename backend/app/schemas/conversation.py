@@ -5,6 +5,8 @@ from typing import Optional
 from sqlalchemy import JSON
 from sqlmodel import Field, SQLModel
 
+from app.schemas.user import UserPublic
+
 
 # Shared properties
 class ConversationBase(SQLModel):
@@ -42,8 +44,14 @@ class ConversationPublic(ConversationBase):
     updated_at: Optional[datetime] = None
 
 
+# Enhanced conversation with participant info for better display
+class ConversationWithParticipants(ConversationPublic):
+    participants: list[UserPublic] = Field(default_factory=list)
+    other_participants: list[UserPublic] = Field(default_factory=list)  # Excludes current user
+
+
 class ConversationsPublic(SQLModel):
-    data: list[ConversationPublic]
+    data: list[ConversationWithParticipants]
     count: int
 
 

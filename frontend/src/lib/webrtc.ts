@@ -36,6 +36,7 @@ export interface CallState {
 
 export class WebRTCService {
   private ws?: WebSocket | undefined;
+  private signalingSocket?: WebSocket | null;
   private localStream?: MediaStream | undefined;
   private peerConnections: Map<string, RTCPeerConnection> = new Map();
   private config: WebRTCConfig;
@@ -68,6 +69,7 @@ export class WebRTCService {
 
   private updateState(updates: Partial<CallState>) {
     this.callState = { ...this.callState, ...updates };
+    console.log("WebRTC state updated:", this.callState);
     this.onStateChange?.(this.callState);
   }
 
@@ -250,33 +252,42 @@ export class WebRTCService {
   }
 
   private async connectSignaling(callId: string): Promise<void> {
-    const token = tokenManager.getValidToken();
-    const wsUrl = `ws://localhost:4000/api/v1/calls/${callId}/signaling${
-      token ? `?token=${token}` : ""
-    }`;
+    return new Promise((resolve, reject) => {
+      // Use the same base URL as the API client but with ws protocol
+      const baseUrl =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+      const wsUrl = baseUrl
+        .replace("http://", "ws://")
+        .replace("https://", "wss://");
 
-    this.ws = new WebSocket(wsUrl);
+      this.signalingSocket = new WebSocket(
+        `${wsUrl}/calls/${callId}/signaling`
+      );
 
-    this.ws.onopen = () => {
-      console.log("Signaling connection established");
-    };
+      this.signalingSocket.onopen = () => {
+        console.log("Signaling WebSocket connected");
+        resolve();
+      };
 
-    this.ws.onmessage = async (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        await this.handleSignalingMessage(message);
-      } catch (error) {
-        console.error("Failed to handle signaling message:", error);
-      }
-    };
+      this.signalingSocket.onclose = (event) => {
+        console.log("Signaling WebSocket closed:", event.code, event.reason);
+        this.signalingSocket = null;
+      };
 
-    this.ws.onerror = (error) => {
-      console.error("Signaling WebSocket error:", error);
-    };
+      this.signalingSocket.onerror = (error) => {
+        console.error("Signaling WebSocket error:", error);
+        reject(error);
+      };
 
-    this.ws.onclose = () => {
-      console.log("Signaling connection closed");
-    };
+      this.signalingSocket.onmessage = (event: MessageEvent) => {
+        try {
+          const message = JSON.parse(event.data) as SignalingMessage;
+          this.handleSignalingMessage(message);
+        } catch (error) {
+          console.error("Error parsing signaling message:", error);
+        }
+      };
+    });
   }
 
   private async handleSignalingMessage(
@@ -474,6 +485,11 @@ export class WebRTCService {
     callerId: string,
     callType: "audio" | "video"
   ): void {
+    console.log("🔔 WebRTC: handleIncomingCall called with:", {
+      callId,
+      callerId,
+      callType,
+    });
     this.updateState({
       callId,
       isIncoming: true,
@@ -481,6 +497,7 @@ export class WebRTCService {
       isVideoEnabled: callType === "video",
       participants: [{ userId: callerId }],
     });
+    console.log("🔔 WebRTC: State updated, new state:", this.callState);
   }
 }
 

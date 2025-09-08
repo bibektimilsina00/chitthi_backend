@@ -102,7 +102,28 @@ function ConversationItem({
   isActive,
   onClick,
 }: ConversationItemProps) {
-  const displayName = conversation.title || "Untitled Conversation";
+  const getDisplayName = () => {
+    if (conversation.title) {
+      return conversation.title;
+    }
+
+    if (
+      conversation.type === "direct" &&
+      conversation.other_participants &&
+      conversation.other_participants.length > 0
+    ) {
+      const otherUser = conversation.other_participants[0];
+      return otherUser?.display_name || otherUser?.username || "Unknown User";
+    }
+
+    if (conversation.type === "group") {
+      return `Group (${conversation.member_count} members)`;
+    }
+
+    return "Untitled Conversation";
+  };
+
+  const displayName = getDisplayName();
   const lastActivity = conversation.last_activity
     ? formatRelativeTime(conversation.last_activity)
     : "No activity";

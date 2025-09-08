@@ -144,8 +144,19 @@ export function useIncomingCalls() {
 
   const handleIncomingCall = useCallback(
     (callId: string, callerId: string, callType: "audio" | "video") => {
+      console.log("🎯 useIncomingCalls: handleIncomingCall called with:", {
+        callId,
+        callerId,
+        callType,
+      });
       setIncomingCall({ callId, callerId, callType });
+      console.log(
+        "🎯 useIncomingCalls: Calling webrtcService.handleIncomingCall"
+      );
       webrtcService.handleIncomingCall(callId, callerId, callType);
+      console.log(
+        "🎯 useIncomingCalls: webrtcService.handleIncomingCall completed"
+      );
     },
     []
   );

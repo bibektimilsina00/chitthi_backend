@@ -56,7 +56,7 @@ class WebSocketManager {
         throw new Error("No valid authentication token");
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:4000";
+      const baseUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000";
       const wsUrl = `${baseUrl}/api/v1/chat/ws/${deviceId}?token=${token}`;
 
       this.ws = new WebSocket(wsUrl);
