@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { CheckIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { Message } from "@/types/chat";
 import { useAuth } from "@/hooks/use-auth";
-import { decodeMockMessage } from "@/lib/mock-data";
+import { hasAttachments, getMessageAttachments, formatFileSize } from "@/lib/message-utils";
 
 // Custom double check icon since it's not in heroicons
 function DoubleCheckIcon({ className }: { className?: string }) {
@@ -218,17 +218,19 @@ interface MessageContentProps {
 }
 
 function MessageContent({ message }: MessageContentProps) {
+  const attachments = getMessageAttachments(message);
+  
   // Try to decode mock messages for development, otherwise show encrypted placeholder
   const getDisplayContent = () => {
     switch (message.message_type) {
       case "text":
-        // Try to decode mock message first, fallback to showing encrypted content
-        const decodedText = decodeMockMessage(message.ciphertext);
-        return decodedText !== "[Encrypted Message]"
-          ? decodedText
-          : "[Encrypted Message] " +
-              message.ciphertext.substring(0, 50) +
-              "...";
+        // For now, display the ciphertext as is (in real app, this would be decrypted)
+        // If ciphertext looks like plain text (for testing), show it directly
+        if (message.ciphertext && !message.ciphertext.startsWith("encrypted_") && message.ciphertext.length < 100) {
+          return message.ciphertext;
+        }
+        // Otherwise show as encrypted message
+        return "[Encrypted Message]";
       case "image":
         return (
           <div className="flex items-center space-x-2 text-sm">
@@ -271,9 +273,9 @@ function MessageContent({ message }: MessageContentProps) {
       {getDisplayContent()}
 
       {/* Attachments */}
-      {message.attachments.length > 0 && (
+      {hasAttachments(message) && (
         <div className="mt-2 space-y-1">
-          {message.attachments.map((attachment) => (
+          {attachments.map((attachment) => (
             <div
               key={attachment.id}
               className="flex items-center space-x-2 text-sm bg-black bg-opacity-10 rounded p-2"
@@ -281,7 +283,7 @@ function MessageContent({ message }: MessageContentProps) {
               <span>📎</span>
               <span className="truncate">{attachment.file_name}</span>
               <span className="text-xs opacity-75">
-                ({Math.round(attachment.file_size / 1024)}KB)
+                ({formatFileSize(attachment.file_size)})
               </span>
             </div>
           ))}

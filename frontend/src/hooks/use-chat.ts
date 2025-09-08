@@ -3,12 +3,12 @@ import useSWR from "swr";
 import { useAuth } from "./use-auth";
 import { conversationsApi, messagesApi } from "@/lib/chat-api";
 import { webSocketManager, type WebSocketEventType } from "@/lib/websocket";
-import { useMockData } from "@/lib/mock-data";
 import {
   type ConversationCreate,
   type MessageCreate,
   type WebSocketMessage,
   type MessageDraft,
+  type Conversation,
 } from "@/types/chat";
 
 /**
@@ -16,7 +16,6 @@ import {
  */
 export function useConversations() {
   const { user } = useAuth();
-  const { getMockConversations, shouldUseMockData } = useMockData();
 
   const {
     data: conversationsResponse,
@@ -26,31 +25,13 @@ export function useConversations() {
   } = useSWR(
     user ? "/conversations" : null,
     async () => {
-      try {
-        return await conversationsApi.getConversations();
-      } catch (err) {
-        // If API fails, return mock data structure
-        if (shouldUseMockData(err, null)) {
-          return {
-            data: getMockConversations(),
-            count: getMockConversations().length,
-          };
-        }
-        throw err;
-      }
+      return await conversationsApi.getConversations();
     },
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
     }
   );
-
-  // Use mock data if no data and in development
-  const finalData =
-    conversationsResponse ||
-    (shouldUseMockData(error, conversationsResponse)
-      ? { data: getMockConversations(), count: getMockConversations().length }
-      : { data: [], count: 0 });
 
   const createConversation = useCallback(
     async (data: ConversationCreate) => {
@@ -79,8 +60,8 @@ export function useConversations() {
   );
 
   return {
-    conversations: finalData.data || [],
-    count: finalData.count || 0,
+    conversations: conversationsResponse?.data || [],
+    count: conversationsResponse?.count || 0,
     isLoading,
     error,
     createConversation,
@@ -95,7 +76,6 @@ export function useConversations() {
  */
 export function useMessages(conversationId: string | null) {
   const { user } = useAuth();
-  const { getMockMessages, shouldUseMockData } = useMockData();
 
   const {
     data: messagesResponse,
@@ -105,34 +85,13 @@ export function useMessages(conversationId: string | null) {
   } = useSWR(
     user && conversationId ? `/messages/${conversationId}` : null,
     async () => {
-      try {
-        return await messagesApi.getMessages(conversationId!);
-      } catch (err) {
-        // If API fails, return mock data structure
-        if (shouldUseMockData(err, null)) {
-          return {
-            data: getMockMessages(conversationId!),
-            count: getMockMessages(conversationId!).length,
-          };
-        }
-        throw err;
-      }
+      return await messagesApi.getMessages(conversationId!);
     },
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
     }
   );
-
-  // Use mock data if no data and in development
-  const finalData =
-    messagesResponse ||
-    (shouldUseMockData(error, messagesResponse)
-      ? {
-          data: getMockMessages(conversationId || ""),
-          count: getMockMessages(conversationId || "").length,
-        }
-      : { data: [], count: 0 });
 
   const sendMessage = useCallback(
     async (messageData: MessageCreate) => {
@@ -173,8 +132,8 @@ export function useMessages(conversationId: string | null) {
   );
 
   return {
-    messages: finalData.data || [],
-    count: finalData.count || 0,
+    messages: messagesResponse?.data || [],
+    count: messagesResponse?.count || 0,
     isLoading,
     error,
     sendMessage,
@@ -436,7 +395,7 @@ export function useChat() {
     messages,
     currentConversationId,
     currentConversation:
-      conversations.find((c) => c.id === currentConversationId) || null,
+      conversations.find((c: Conversation) => c.id === currentConversationId) || null,
     typingUsers,
     isLoading: conversationsLoading || messagesLoading,
     isConnected,

@@ -73,8 +73,13 @@ export class TokenManager {
 
   /**
    * Check if user is authenticated (has valid token)
+   * Returns false during SSR to prevent hydration mismatches
    */
   isAuthenticated(): boolean {
+    // During SSR, always return false to prevent hydration mismatches
+    if (typeof window === "undefined") {
+      return false;
+    }
     return this.getValidToken() !== null;
   }
 
